@@ -9,6 +9,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class HealthChecker {
 
     private final ScheduledExecutorService scheduler;
@@ -16,6 +19,9 @@ public class HealthChecker {
 
     private volatile boolean isDatabaseHealthy = false;
     private volatile boolean isDiskHealthy = false;
+
+    private static final Logger logger = LoggerFactory.getLogger(HealthChecker.class);
+
 
     public HealthChecker(ScheduledExecutorService scheduler) {
         this.scheduler = scheduler;
@@ -29,22 +35,22 @@ public class HealthChecker {
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 isDatabaseHealthy = connectionIsAlive();
-                System.out.println("Database: " +
+                logger.info("Database: " +
                         (isDatabaseHealthy ? "UP" : "DOWN"));
             } catch (SQLException e) {
                 isDatabaseHealthy = false;
-                System.out.println("Database check failed: " + e.getMessage());
+                logger.error("Database check failed: " + e.getMessage());
                 throw new RuntimeException(e);
             }
         }, 0, 30, TimeUnit.SECONDS);
 
         scheduler.scheduleAtFixedRate(() -> {
             isDiskHealthy = diskSpace();
-            System.out.println("Disk: " +
+            logger.info("Disk: " +
                     (isDiskHealthy ? "OK" : "LOW SPACE"));
         }, 0, 60, TimeUnit.SECONDS);
 
-        System.out.println("Health monitoring started");
+        logger.info("Health monitoring started");
     }
 
     private Connection getConnection() {
@@ -57,20 +63,20 @@ public class HealthChecker {
             Connection conn = getConnection();
 
             if (conn == null) {
-                System.err.println("Connection is NULL!");
+                logger.error("Connection is NULL!");
                 throw new SQLException("Connection is null");
             }
 
-            System.out.println("Testing connection with isValid()...");
+            //System.out.println("Testing connection with isValid()...");
 
             if (conn.isValid(5)) {
-                System.out.println("Database connection is valid");
+                logger.info("Database connection is valid");
                 return true;
             } else {
                 throw new SQLException("Database connection not valid");
             }
         } catch (SQLException e){
-            System.err.println("Database health check failed: " + e.getMessage());
+            logger.error("Database health check failed: " + e.getMessage());
             e.printStackTrace();
 
             throw e;

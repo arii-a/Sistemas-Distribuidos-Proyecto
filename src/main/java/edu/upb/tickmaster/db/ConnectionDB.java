@@ -9,6 +9,10 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
+import edu.upb.tickmaster.proxy.ReverseProxyServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Es una clase Singleton,
  * @author Usuario
@@ -19,6 +23,8 @@ public class ConnectionDB {
     private String contraseña = "1234567890";
     private int port;
 
+    private static final Logger logger = LoggerFactory.getLogger(ConnectionDB.class);
+
     private static final ConnectionDB db ;
     private Connection connection;
 
@@ -28,12 +34,12 @@ public class ConnectionDB {
 
     // constructor privado
     private ConnectionDB() {
-        System.out.println("Iniciando Singleton de Base de Datos...");
+        //System.out.println("Iniciando Singleton de Base de Datos...");
         try {
             // Establish the connection once
             this.connection = DriverManager.getConnection(url, user, contraseña);
         } catch (SQLException e) {
-            System.err.println("Error al conectar a postgreSQL: " + e.getMessage());
+            logger.error("Error al conectar a postgreSQL: " + e.getMessage());
         }
     }
 

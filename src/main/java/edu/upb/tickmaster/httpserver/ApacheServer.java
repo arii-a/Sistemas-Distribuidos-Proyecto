@@ -8,6 +8,8 @@ package edu.upb.tickmaster.httpserver;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
 import edu.upb.tickmaster.health.HealthChecker;
+import edu.upb.tickmaster.httpserver.handlers.ClientsGetHandler;
+import edu.upb.tickmaster.httpserver.handlers.ClientsPostHandler;
 
 import java.io.*;
 import java.net.InetSocketAddress;
@@ -52,9 +54,19 @@ public class ApacheServer {
                 new EchoPostHandler().handle(exchange);
             });
 
-            this.server.createContext("/clients", exchange -> {
+            this.server.createContext("/getClients", exchange -> {
                 exchange.getResponseHeaders().add("X-Backend-Instance", instanceId);
                 new ClientsGetHandler().handle(exchange);
+            });
+
+            /*this.server.createContext("/clients", exchange -> {
+                exchange.getResponseHeaders().add("X-Backend-Instance", instanceId);
+                new ClientsGetHandler().handle(exchange);
+            });*/
+
+            this.server.createContext("/addClient", exchange -> {
+                exchange.getResponseHeaders().add("X-Backend-Instance", instanceId);
+                new ClientsPostHandler().handle(exchange);
             });
 
             this.server.createContext("/backendHealth", exchange -> {
@@ -96,18 +108,18 @@ public class ApacheServer {
 
             this.server.start();
 
-            System.out.println("Backend started on " + port + " port");
+            //System.out.println("Backend started on " + port + " port");
             return true;
 
         } catch (IOException e) {
-            System.err.println("Error al iniciar el servidor: " + e.getMessage());
+            //System.err.println("Error al iniciar el servidor: " + e.getMessage());
             e.printStackTrace();
             this.server = null;
         }
         return false;
     }
 
-        public int getPort() {
+    public int getPort() {
         return port;
     }
 
@@ -119,7 +131,7 @@ public class ApacheServer {
         if (this.server != null) {
             this.server.stop(0);
             this.server = null;
-            System.out.println("Backend server stopped");
+            //System.out.println("Backend server stopped");
         }
     }
 
