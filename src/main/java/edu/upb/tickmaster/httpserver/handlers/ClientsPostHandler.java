@@ -125,7 +125,7 @@ public class ClientsPostHandler implements HttpHandler {
              /*if ("backend-1".equals(instanceId)) {
                  Thread.sleep(3000);
              }*/
-             Thread.sleep(2000); //probando funcionamiento del read timeout
+             //Thread.sleep(2000); //probando funcionamiento del read timeout
              statement.close();
 
                 if (rows > 0) {
@@ -139,9 +139,9 @@ public class ClientsPostHandler implements HttpHandler {
                     return new int[]{200};
                 }
                 logger.warn("Intento fallido: " + e.getMessage());
-            } catch (InterruptedException e) {
+            } /*catch (InterruptedException e) {
              throw new RuntimeException(e); //solo usado para sleep
-         }
+         }*/
 
         return new int[]{500};
     }

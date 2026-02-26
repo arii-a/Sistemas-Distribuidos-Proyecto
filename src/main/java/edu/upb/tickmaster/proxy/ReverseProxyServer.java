@@ -13,6 +13,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import edu.upb.tickmaster.httpserver.handlers.RegisterHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,15 +40,16 @@ public class ReverseProxyServer {
         this.strategy = strategy;
     }
 
-    public void addBackendServer(String host, int port, String instanceId) {
-        backends.add(new BackendInstance(port, instanceId));
-        logger.info("Added backend: " + instanceId + " at " + host + ":" + port);
+    public void addBackendServer(String ip, int port, String instanceId) {
+        backends.add(new BackendInstance(ip, port, instanceId));
+        logger.info("Added backend: " + instanceId + " at " + ip + ":" + port);
     }
 
     public boolean start() {
         try {
             server = HttpServer.create(new InetSocketAddress(port), 0);
             server.createContext("/", this::handleRequest);
+            server.createContext("/register", new RegisterHandler(backends));
             server.setExecutor(Executors.newFixedThreadPool(20));
             server.start();
             logger.info("\nProxy on port " + port);
@@ -216,11 +218,13 @@ public class ReverseProxyServer {
         }
     }
 
-    private static class BackendInstance {
+    public static class BackendInstance {
+        final String ip;
         final int port;
         final String instanceId;
 
-        BackendInstance(int port, String instanceId) {
+        public BackendInstance(String ip, int port, String instanceId) {
+            this.ip = ip;
             this.port = port;
             this.instanceId = instanceId;
         }

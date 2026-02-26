@@ -71,7 +71,7 @@
                             <archive>
                                 <manifest>
                                     <mainClass>
-                                        edu.upb.Tickmaster
+                                       edu.upb.tickmaster.Main
                                     </mainClass>
                                 </manifest>
                             </archive>

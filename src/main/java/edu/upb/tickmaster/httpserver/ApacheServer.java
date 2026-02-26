@@ -7,12 +7,21 @@ package edu.upb.tickmaster.httpserver;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
+import edu.upb.tickmaster.Main;
 import edu.upb.tickmaster.health.HealthChecker;
 import edu.upb.tickmaster.httpserver.handlers.ClientsGetHandler;
 import edu.upb.tickmaster.httpserver.handlers.ClientsPostHandler;
+import edu.upb.tickmaster.httpserver.handlers.RegisterHandler;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executors;
 
@@ -23,10 +32,12 @@ import java.util.concurrent.Executors;
 public class ApacheServer {
     private HttpServer server = null;
     private boolean isServerDone = false;
-    private final int port;
-    private final String instanceId;
+    private int port;
+    private String instanceId;
 
     private final HealthChecker healthChecker;
+
+    private static final Logger logger = LoggerFactory.getLogger(ApacheServer.class);
 
     public ApacheServer(int port, String instanceId, HealthChecker healthChecker){
         this.port = port;
@@ -69,6 +80,11 @@ public class ApacheServer {
                 new ClientsPostHandler().handle(exchange);
             });
 
+            this.server.createContext("/register", exchange -> {
+                exchange.getResponseHeaders().add("X-Backend-Instance", instanceId);
+                new RegisterHandler().handle(exchange);
+            });
+
             this.server.createContext("/backendHealth", exchange -> {
                 String response = String.format(
                         "{\"status\":\"OK\",\"instance\":\"%s\",\"port\":%d}",
@@ -108,6 +124,8 @@ public class ApacheServer {
 
             this.server.start();
 
+            selfRegister();
+
             //System.out.println("Backend started on " + port + " port");
             return true;
 
@@ -117,6 +135,27 @@ public class ApacheServer {
             this.server = null;
         }
         return false;
+    }
+
+    private void selfRegister() {
+        try {
+            String jsonBody = String.format(
+                    "{\"ip\":\"localhost\",\"port\":%d,\"instanceId\":\"%s\"}",
+                    port, instanceId
+            );
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:8080/register"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .build();
+
+            HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+            logger.info("Backend " + instanceId + " registrado exitosamente");
+
+        } catch (Exception e) {
+            logger.error("Error al registrarse: " + e.getMessage());
+        }
     }
 
     public int getPort() {

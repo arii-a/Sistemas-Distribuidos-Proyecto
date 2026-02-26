@@ -18,9 +18,11 @@ import org.slf4j.LoggerFactory;
  * @author Usuario
  */
 public class ConnectionDB {
-    private final String url = "jdbc:postgresql://localhost:5432/client_ticket";
-    private String user = "postgres";
-    private String contraseña = "1234567890";
+    private final String url = "jdbc:postgresql://" + 
+    (System.getenv("DB_HOST") != null ? System.getenv("DB_HOST") : "localhost") + ":5432/" +
+    (System.getenv("DB_NAME") != null ? System.getenv("DB_NAME") : "client_ticket");
+private String user = System.getenv("DB_USER") != null ? System.getenv("DB_USER") : "postgres";
+private String contraseña = System.getenv("DB_PASSWORD") != null ? System.getenv("DB_PASSWORD") : "1234567890";
     private int port;
 
     private static final Logger logger = LoggerFactory.getLogger(ConnectionDB.class);

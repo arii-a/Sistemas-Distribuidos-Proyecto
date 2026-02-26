@@ -1,7 +1,6 @@
 package edu.upb.tickmaster;
 
 import edu.upb.tickmaster.httpserver.ApacheServer;
-import edu.upb.tickmaster.httpserver.TicketMasterClient;
 import edu.upb.tickmaster.proxy.ReverseProxyServer;
 import edu.upb.tickmaster.health.HealthChecker;
 
@@ -29,6 +28,19 @@ public class Main {
         HealthChecker healthChecker = new HealthChecker(scheduler);
         healthChecker.monitoring();
 
+        ReverseProxyServer proxy = new ReverseProxyServer(
+                proxyPort,
+                ReverseProxyServer.LoadBalancingStrategy.ROUND_ROBIN
+        );
+
+        if (proxy.start()) {
+            System.out.println("\nReverse Proxy started on port " + proxyPort);
+            logger.info("\nReverse Proxy started on port " + proxyPort);
+        } else {
+            System.err.println("Failed to start reverse proxy");
+            logger.error("Failed to start reverse proxy");
+        }
+
         for (int i = 0; i < ports.length; i++) {
             String instanceId = "backend-" + (i + 1);
             ApacheServer backend = new ApacheServer(ports[i], instanceId, healthChecker);
@@ -43,22 +55,9 @@ public class Main {
             }
         }
 
-        ReverseProxyServer proxy = new ReverseProxyServer(
-                proxyPort,
-                ReverseProxyServer.LoadBalancingStrategy.ROUND_ROBIN
-        );
-
 
         for (int i = 0; i < ports.length; i++) {
             proxy.addBackendServer("localhost", ports[i], "backend-" + (i + 1));
-        }
-
-        if (proxy.start()) {
-            System.out.println("\nReverse Proxy started on port " + proxyPort);
-            logger.info("\nReverse Proxy started on port " + proxyPort);
-        } else {
-            System.err.println("Failed to start reverse proxy");
-            logger.error("Failed to start reverse proxy");
         }
 
         /*String instanceId = "";
