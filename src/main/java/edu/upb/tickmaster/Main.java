@@ -1,10 +1,12 @@
 package edu.upb.tickmaster;
 
+import edu.upb.tickmaster.grpc.ProtoServer;
 import edu.upb.tickmaster.httpserver.ApacheServer;
 import edu.upb.tickmaster.proxy.ReverseProxyServer;
 import edu.upb.tickmaster.health.HealthChecker;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -13,7 +15,7 @@ import org.slf4j.LoggerFactory;
 
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException, InterruptedException {
 
         //new File("logs").mkdirs();
         File dir = new File("logs");
@@ -63,5 +65,8 @@ public class Main {
         /*String instanceId = "";
         ApacheServer apacheServer = new ApacheServer(port, instanceId);
         apacheServer.start();*/
+
+        ProtoServer protoServer = new ProtoServer();
+        protoServer.start();
     }
 }

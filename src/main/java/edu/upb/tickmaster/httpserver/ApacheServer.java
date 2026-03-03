@@ -11,6 +11,7 @@ import edu.upb.tickmaster.Main;
 import edu.upb.tickmaster.health.HealthChecker;
 import edu.upb.tickmaster.httpserver.handlers.ClientsGetHandler;
 import edu.upb.tickmaster.httpserver.handlers.ClientsPostHandler;
+import edu.upb.tickmaster.httpserver.handlers.CompraHandler;
 import edu.upb.tickmaster.httpserver.handlers.RegisterHandler;
 
 import org.slf4j.Logger;
@@ -118,6 +119,11 @@ public class ApacheServer {
                 OutputStream os = exchange.getResponseBody();
                 os.write(bytes);
                 os.close();
+            });
+
+            this.server.createContext("/comprar", exchange -> {
+                exchange.getResponseHeaders().add("X-Backend-Instance", instanceId);
+                new CompraHandler().handle(exchange);
             });
 
             this.server.setExecutor(Executors.newFixedThreadPool(10));
