@@ -49,7 +49,40 @@ public class ReverseProxyServer {
         try {
             server = HttpServer.create(new InetSocketAddress(port), 0);
             server.createContext("/", this::handleRequest);
-            server.createContext("/register", new RegisterHandler(backends));
+
+            server.createContext("/register", exchange -> {
+                if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    exchange.sendResponseHeaders(405, -1);
+                    return;
+                }
+                try {
+                    String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                    JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+
+                    String ip = json.get("ip").getAsString();
+                    int backendPort = json.get("port").getAsInt();
+                    String instanceId = json.get("instanceId").getAsString();
+
+                    boolean alreadyRegistered = backends.stream()
+                            .anyMatch(b -> b.instanceId.equals(instanceId));
+
+                    if (!alreadyRegistered) {
+                        backends.add(new BackendInstance(ip, backendPort, instanceId));
+                        logger.info("Backend auto-registrado: " + instanceId + " en " + ip + ":" + backendPort);
+                    }
+
+                    String response = "{\"status\":\"OK\",\"message\":\"Registered\"}";
+                    byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().add("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(200, bytes.length);
+                    try (OutputStream os = exchange.getResponseBody()) { os.write(bytes); }
+
+                } catch (Exception e) {
+                    logger.error("Error en /register: " + e.getMessage());
+                    sendErrorResponse(exchange, 400, "Invalid registration payload");
+                }
+            });
+
             server.setExecutor(Executors.newFixedThreadPool(20));
             server.start();
             logger.info("\nProxy on port " + port);
@@ -76,7 +109,16 @@ public class ReverseProxyServer {
             } catch (Exception ignored) {}
         }
 
+        if ("OPTIONS".equals(ex.getRequestMethod())) {
+            ex.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+            ex.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            ex.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            ex.sendResponseHeaders(204, -1);
+            return;
+        }
+
         int maxRetries = 3;
+        boolean responseSent = false;
 
         //Set<String> failedBackends = new HashSet<>();
 
@@ -96,10 +138,11 @@ public class ReverseProxyServer {
 
                 String path = ex.getRequestURI().toString();
                 String targetUrl = "http://localhost:" + backend.port + path;
+                logger.info("Forwarding to: " + targetUrl);
 
                 conn = (HttpURLConnection) new URL(targetUrl).openConnection();
                 conn.setRequestMethod(ex.getRequestMethod());
-                conn.setConnectTimeout(3);
+                conn.setConnectTimeout(3000);
                 conn.setReadTimeout(2000);
                 conn.setDoInput(true);
                 conn.setDoOutput(true);
@@ -111,7 +154,7 @@ public class ReverseProxyServer {
                     }
                 });
 
-                if (ex.getRequestMethod().equals("POST") && requestBody.length > 0) {
+                if (requestBody.length > 0) {
                     try (OutputStream out = conn.getOutputStream()) {
                         out.write(requestBody);
                         out.flush();
@@ -148,8 +191,10 @@ public class ReverseProxyServer {
                     }
                 });
 
+                ex.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
                 ex.getResponseHeaders().add("Proxy-Backend", backend.instanceId);
                 ex.sendResponseHeaders(status, responseBody.length);
+                responseSent = true;
 
                 try (OutputStream clientOutput = ex.getResponseBody()) {
                     clientOutput.write(responseBody);
@@ -170,8 +215,10 @@ public class ReverseProxyServer {
             }
         }
 
-        logger.error("Todos los intentos fallaron");
-        sendErrorResponse(ex, 502, "Bad Gateway");
+        if (!responseSent) {
+            logger.error("Todos los intentos fallaron");
+            sendErrorResponse(ex, 502, "Bad Gateway");
+        }
         ex.getResponseBody().close();
     }
 
@@ -227,6 +274,19 @@ public class ReverseProxyServer {
             this.ip = ip;
             this.port = port;
             this.instanceId = instanceId;
+        }
+    }
+
+    public static void main(String[] args) {
+        ReverseProxyServer proxy = new ReverseProxyServer(
+            8080,
+            ReverseProxyServer.LoadBalancingStrategy.ROUND_ROBIN
+        );
+
+        if (proxy.start()) {
+            System.out.println("Reverse Proxy started on port 8080");
+        } else {
+            System.err.println("Failed to start reverse proxy");
         }
     }
 }

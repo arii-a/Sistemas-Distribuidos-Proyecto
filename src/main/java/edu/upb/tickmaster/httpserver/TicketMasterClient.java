@@ -37,7 +37,7 @@ public class TicketMasterClient {
         for (int i = 0; i < maxRetries; i++) {
             System.out.println("primer intento");
             try {
-                String jsonBody = String.format("{\"name\":\"%s\", \"lastname\":\"%s\", \"idempotensy_key\":\"%s\"}",
+                String jsonBody = String.format("{\"name\":\"%s\", \"lastname\":\"%s\", \"idempotency_key\":\"%s\"}",
                         name, lastname, idempotencyKey);
 
                 System.out.println("creando request");

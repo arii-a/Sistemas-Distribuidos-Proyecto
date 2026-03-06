@@ -2,34 +2,23 @@ package edu.upb.tickmaster.httpserver.handlers;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.google.gson.JsonSyntaxException;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import edu.upb.tickmaster.db.ConnectionDB;
-import edu.upb.tickmaster.httpserver.ApacheServer;
 import edu.upb.tickmaster.httpserver.ContentType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.sql.*;
-import java.util.Scanner;
-import java.util.UUID;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
-public class ClientsGetHandler implements HttpHandler {
-    private static final Logger logger = LoggerFactory.getLogger(ApacheServer.class);
-
-
+public class FacturaGetHandler implements HttpHandler {
     private Connection getConnection() {
         return ConnectionDB.instance().getConnection();
-    }
-
-    public ClientsGetHandler() {
     }
 
     @Override
@@ -39,13 +28,13 @@ public class ClientsGetHandler implements HttpHandler {
 
         try {
             Headers responseHeaders = exchange.getResponseHeaders();
+            responseHeaders.add("Access-Control-Allow-Origin", "*");
             responseHeaders.add("Content-Type", ContentType.JSON.toString());
 
             String method = exchange.getRequestMethod();
 
             if (method.equals("GET")) {
-                logger.info("GET /api/v1/clients recibido");
-                response = getAllClients();
+                response = getAllEvents();
                 statusCode = 200;
 
             } else if (method.equals("OPTIONS")) {
@@ -53,7 +42,6 @@ public class ClientsGetHandler implements HttpHandler {
                 statusCode = 200;
 
             } else {
-                logger.info("Método recibido: '" + method + "'");
                 response = "{\"status\": \"NOK\",\"message\": \"Método no soportado\"}";
                 statusCode = 405;
             }
@@ -78,12 +66,12 @@ public class ClientsGetHandler implements HttpHandler {
         os.close();
     }
 
-    private String getAllClients() throws SQLException {
+    private String getAllEvents() throws SQLException {
         JsonArray jsonArray = new JsonArray();
-        String query = "SELECT u.username, u.nombre, r.descripcion " +
-                "FROM public.users as u " +
-                "INNER JOIN public.rol as r " +
-                "ON u.rol_id = r.id";
+        String query = "SELECT u.username, f.monto, f.fecha, f.nit" +
+                "FROM public.factura AS f " +
+                "INNER JOIN public.users AS u " +
+                "WHERE f.user_id = u.id ";
 
         Connection conn = getConnection();
         PreparedStatement statement = null;
@@ -96,8 +84,9 @@ public class ClientsGetHandler implements HttpHandler {
             while (result.next()) {
                 JsonObject obj = new JsonObject();
                 obj.addProperty("username", result.getString("username"));
-                obj.addProperty("nombre", result.getString("nombre"));
-                obj.addProperty("rol", result.getString("descripcion"));
+                obj.addProperty("monto", result.getInt("monto"));
+                obj.addProperty("fecha", String.valueOf(result.getDate("fecha")));
+                obj.addProperty("nit", result.getInt("nit"));
                 jsonArray.add(obj);
             }
         } finally {

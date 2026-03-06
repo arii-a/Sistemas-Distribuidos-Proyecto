@@ -6,12 +6,11 @@ package edu.upb.tickmaster.httpserver;
 
 
 import com.sun.net.httpserver.Headers;
+import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import edu.upb.tickmaster.Main;
 import edu.upb.tickmaster.health.HealthChecker;
-import edu.upb.tickmaster.httpserver.handlers.ClientsGetHandler;
-import edu.upb.tickmaster.httpserver.handlers.ClientsPostHandler;
-import edu.upb.tickmaster.httpserver.handlers.RegisterHandler;
+import edu.upb.tickmaster.httpserver.handlers.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +22,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.Executors;
 
 /**
@@ -39,6 +41,8 @@ public class ApacheServer {
 
     private static final Logger logger = LoggerFactory.getLogger(ApacheServer.class);
 
+    Properties props = new Properties();
+
     public ApacheServer(int port, String instanceId, HealthChecker healthChecker){
         this.port = port;
         this.instanceId = instanceId;
@@ -47,43 +51,27 @@ public class ApacheServer {
     
     public boolean start() {
         try {
+            props.load(ApacheServer.class.getClassLoader().getResourceAsStream("paths.properties"));
+
             this.server = HttpServer.create(new InetSocketAddress(port), 0);
 
-            this.server.createContext("/", exchange -> {
-                Headers headers = exchange.getResponseHeaders();
-                headers.add("Access-Control-Allow-Origin", "*");
-                headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-                headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-                headers.add("X-Backend-Instance", instanceId);
-
-                new RootHandler().handle(exchange);
-            });
-
-            this.server.createContext("/hola", exchange -> {
-                exchange.getResponseHeaders().add("X-Backend-Instance", instanceId);
-                new EchoPostHandler().handle(exchange);
-            });
-
-            this.server.createContext("/getClients", exchange -> {
-                exchange.getResponseHeaders().add("X-Backend-Instance", instanceId);
-                new ClientsGetHandler().handle(exchange);
-            });
-
-            /*this.server.createContext("/clients", exchange -> {
-                exchange.getResponseHeaders().add("X-Backend-Instance", instanceId);
-                new ClientsGetHandler().handle(exchange);
-            });*/
-
-            this.server.createContext("/addClient", exchange -> {
-                exchange.getResponseHeaders().add("X-Backend-Instance", instanceId);
-                new ClientsPostHandler().handle(exchange);
-            });
-
-            this.server.createContext("/register", exchange -> {
-                exchange.getResponseHeaders().add("X-Backend-Instance", instanceId);
-                new RegisterHandler().handle(exchange);
-            });
+            for (String path : props.stringPropertyNames()) {
+                String className = props.getProperty(path);
+                try {
+                    Class<?> clase = Class.forName(className);
+                    HttpHandler handler = (HttpHandler) clase.getDeclaredConstructor().newInstance();
+                    this.server.createContext(path, exchange -> {
+                        exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+                        exchange.getResponseHeaders().add("X-Backend-Instance", instanceId);
+                        handler.handle(exchange);
+                    });
+                    logger.info("Registered: " + path + " -> " + className);
+                } catch (Exception e) {
+                    logger.error("Failed to load handler for " + path + ": " + e.getMessage());
+                }
+            }
 
             this.server.createContext("/backendHealth", exchange -> {
                 String response = String.format(

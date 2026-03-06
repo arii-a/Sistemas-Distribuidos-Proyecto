@@ -6,26 +6,19 @@ import com.google.gson.JsonSyntaxException;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import edu.upb.tickmaster.httpserver.repositories.ClientRepository;
-import edu.upb.tickmaster.httpserver.services.ClientService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import edu.upb.tickmaster.httpserver.repositories.EventRepository;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Scanner;
 
-public class ClientsPostHandler implements HttpHandler {
-    private static String instanceId;
-    private static final Logger logger = LoggerFactory.getLogger(ClientsPostHandler.class);
-    private final ClientService service = new ClientService();
+public class EventPostHandler implements HttpHandler {
 
-
-    public ClientsPostHandler() {
-    }
-
+    private static final EventRepository repository = new EventRepository();
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         String response = "";
@@ -48,26 +41,31 @@ public class ClientsPostHandler implements HttpHandler {
                     } else {
                         JsonObject jsonBody = JsonParser.parseString(body).getAsJsonObject();
 
-                        if (!jsonBody.has("username") || !jsonBody.has("nombre")
-                                || !jsonBody.has("password") || !jsonBody.has("rol_id")) {
+                        if (!jsonBody.has("nombre") || !jsonBody.has("fecha")
+                                || !jsonBody.has("capacidad")) {
                             response = "{\"status\": \"ERROR\", \"message\": \"Campos incompletos\"}";
                             statusCode = 400;
                         } else {
-                            String user = jsonBody.get("username").getAsString().trim();
                             String nombre = jsonBody.get("nombre").getAsString().trim();
-                            String pass = jsonBody.get("password").getAsString().trim();
-                            int rol = jsonBody.get("rol_id").getAsInt();
+                            String fechaStr = jsonBody.get("fecha").getAsString().trim();
+                            int capacidad = jsonBody.get("capacidad").getAsInt();
 
-                            int[] result = service.createClient(user, nombre, pass, rol);
+                            java.sql.Date fecha = null;
+                            try {
+                                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                                java.util.Date utilDate = sdf.parse(fechaStr);
+                                fecha = new java.sql.Date(utilDate.getTime());
+                            } catch (ParseException e) {
+                                e.printStackTrace();
+                            }
+
+                            int[] result = repository.insertClient(nombre, fecha, capacidad);
                             statusCode = result[0];
 
                             if (statusCode == 201) {
-                                response = "{\"status\": \"OK\", \"message\": \"Usuario creado exitosamente\"}";
-                            } else if (statusCode == 409) {
-                                response = "{\"status\": \"ERROR\", \"message\": \"El usuario ya existe\"}";
-                                statusCode = 409;
+                                response = "{\"status\": \"OK\", \"message\": \"Evento creado exitosamente\"}";
                             } else {
-                                response = "{\"status\": \"ERROR\", \"message\": \"No se pudo crear al usuario. Error " + statusCode + "\"}";
+                                response = "{\"status\": \"ERROR\", \"message\": \"No se pudo crear el evento " + statusCode + "\"}";
                                 statusCode = 500;
                             }
                         }
@@ -99,4 +97,5 @@ public class ClientsPostHandler implements HttpHandler {
         os.write(byteResponse);
         os.close();
     }
+
 }

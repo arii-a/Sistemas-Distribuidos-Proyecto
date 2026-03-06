@@ -2,34 +2,28 @@ package edu.upb.tickmaster.httpserver.handlers;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.google.gson.JsonSyntaxException;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import edu.upb.tickmaster.db.ConnectionDB;
-import edu.upb.tickmaster.httpserver.ApacheServer;
 import edu.upb.tickmaster.httpserver.ContentType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.sql.*;
-import java.util.Scanner;
-import java.util.UUID;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
-public class ClientsGetHandler implements HttpHandler {
-    private static final Logger logger = LoggerFactory.getLogger(ApacheServer.class);
-
+public class TicketGetHandler implements HttpHandler {
 
     private Connection getConnection() {
         return ConnectionDB.instance().getConnection();
     }
 
-    public ClientsGetHandler() {
+    public TicketGetHandler() {
+
     }
 
     @Override
@@ -39,13 +33,13 @@ public class ClientsGetHandler implements HttpHandler {
 
         try {
             Headers responseHeaders = exchange.getResponseHeaders();
+            responseHeaders.add("Access-Control-Allow-Origin", "*");
             responseHeaders.add("Content-Type", ContentType.JSON.toString());
 
             String method = exchange.getRequestMethod();
 
             if (method.equals("GET")) {
-                logger.info("GET /api/v1/clients recibido");
-                response = getAllClients();
+                response = getAllTickets();
                 statusCode = 200;
 
             } else if (method.equals("OPTIONS")) {
@@ -53,7 +47,6 @@ public class ClientsGetHandler implements HttpHandler {
                 statusCode = 200;
 
             } else {
-                logger.info("Método recibido: '" + method + "'");
                 response = "{\"status\": \"NOK\",\"message\": \"Método no soportado\"}";
                 statusCode = 405;
             }
@@ -78,12 +71,23 @@ public class ClientsGetHandler implements HttpHandler {
         os.close();
     }
 
-    private String getAllClients() throws SQLException {
+    private String getAllTickets() throws SQLException {
         JsonArray jsonArray = new JsonArray();
-        String query = "SELECT u.username, u.nombre, r.descripcion " +
-                "FROM public.users as u " +
-                "INNER JOIN public.rol as r " +
-                "ON u.rol_id = r.id";
+        String query = "SELECT u.username, " +
+                "e.nombre AS evento, " +
+                "s.descripcion, " +
+                "t.factura_id, " +
+                "f.fecha, " +
+                "f.monto " +
+                "FROM public.ticket_compra AS t " +
+                "INNER JOIN public.users AS u " +
+                "ON t.usuario_id = u.id " +
+                "INNER JOIN public.eventos AS e " +
+                "ON t.eventos_id = e.id " +
+                "INNER JOIN public.sectores AS s " +
+                "ON t.sector_id = s.id " +
+                "INNER JOIN public.facturas AS f " +
+                "ON t.factura_id = f.id;";
 
         Connection conn = getConnection();
         PreparedStatement statement = null;
@@ -96,8 +100,16 @@ public class ClientsGetHandler implements HttpHandler {
             while (result.next()) {
                 JsonObject obj = new JsonObject();
                 obj.addProperty("username", result.getString("username"));
-                obj.addProperty("nombre", result.getString("nombre"));
-                obj.addProperty("rol", result.getString("descripcion"));
+                obj.addProperty("nombre", result.getString("evento"));
+                obj.addProperty("descripción", result.getString("descripción"));
+
+                JsonObject facturaObj = new JsonObject();
+                facturaObj.addProperty("id", result.getInt("factura_id"));
+                facturaObj.addProperty("fecha", result.getString("fecha"));
+                facturaObj.addProperty("monto", result.getDouble("monto"));
+                obj.add("factura", facturaObj);
+                jsonArray.add(obj);
+
                 jsonArray.add(obj);
             }
         } finally {
